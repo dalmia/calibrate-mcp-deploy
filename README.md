@@ -4,11 +4,6 @@ Deploys the published npm package [`@dalmia/calibrate-mcp`](https://www.npmjs.co
 as a **remote, multi-tenant** MCP server on GCP Cloud Run, so shell-less / non-CLI
 clients (Claude Desktop, claude.ai, hosted assistants) can use Calibrate over a URL.
 
-> Cloud Run, not AWS App Runner: App Runner stopped accepting new customers on
-> 2026-04-30. Cloud Run is the simplest remaining container host and scales to zero.
-> The MCP server only calls the backend over HTTPS, so running it on GCP while the
-> backend is on AWS is fine.
-
 This folder is **only** a Docker build context — it holds the `Dockerfile` used to
 build the image. It is not the MCP source (that lives in `dalmia/calibrate-mcp`) and
 it is not the backend. The published npm package is the source of truth; this just
