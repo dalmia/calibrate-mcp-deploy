@@ -49,7 +49,8 @@ gcloud services enable \
   run.googleapis.com artifactregistry.googleapis.com \
   iamcredentials.googleapis.com sts.googleapis.com --project "$PROJECT_ID"
 
-# 2. Artifact Registry repo the workflow pushes to
+# 2. Create the Artifact Registry image repo the workflow pushes images to
+#    ("repository" here = a Docker image store in GCP, not a git repo)
 gcloud artifacts repositories create calibrate-mcp \
   --repository-format=docker --location="$REGION" --project "$PROJECT_ID" || true
 
