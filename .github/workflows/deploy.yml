@@ -26,9 +26,11 @@ permissions:
   id-token: write # for GCP Workload Identity Federation
 
 env:
-  GCP_REGION: asia-south1
-  GCP_PROJECT: your-project-id # <-- set your GCP project id
-  AR_REPO: calibrate-mcp # Artifact Registry repo
+  # Set as repo variables (Settings → Secrets and variables → Actions → Variables),
+  # not hardcoded:  gh variable set GCP_PROJECT --repo <org/repo> --body <id>
+  GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+  GCP_REGION: ${{ vars.GCP_REGION || 'asia-south1' }}
+  AR_REPO: calibrate-mcp # Artifact Registry image repo
   SERVICE: calibrate-mcp # Cloud Run service name
 
 jobs:

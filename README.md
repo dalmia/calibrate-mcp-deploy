@@ -81,14 +81,17 @@ gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
   --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/$GH_REPO" \
   --project "$PROJECT_ID"
 
-# 6. Store the two values GitHub Actions needs
+# 6. Store the values GitHub Actions needs (secrets = credentials, vars = config)
 gh secret set GCP_WIF_PROVIDER --repo "$GH_REPO" \
   --body "projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github"
 gh secret set GCP_SERVICE_ACCOUNT --repo "$GH_REPO" --body "$SA_EMAIL"
+gh variable set GCP_PROJECT --repo "$GH_REPO" --body "$PROJECT_ID"
+# only if not asia-south1:
+# gh variable set GCP_REGION --repo "$GH_REPO" --body "$REGION"
 ```
 
-Then set `GCP_PROJECT` (and `GCP_REGION` if not `asia-south1`) in the workflow's `env`
-block and commit.
+The workflow reads `GCP_PROJECT` / `GCP_REGION` from repo **variables**, so there's no
+project id hardcoded in the workflow and nothing to edit.
 
 **Run:** Actions → **Build & deploy calibrate-mcp** → Run workflow (blank version = latest
 published). Uncomment the `schedule:` block to deploy new npm releases daily.
