@@ -30,23 +30,64 @@ You can deploy **automatically via GitHub Actions** (recommended) or **manually*
 it to Artifact Registry, and deploys to Cloud Run. It authenticates to GCP with Workload
 Identity Federation (GitHub OIDC), so there is no service-account key to store.
 
-**One-time GCP setup:**
+### One-time GCP setup
 
-1. **Enable APIs:** `run.googleapis.com`, `artifactregistry.googleapis.com`,
-   `iamcredentials.googleapis.com`.
-2. **Create the Artifact Registry repo:**
-   ```bash
-   gcloud artifacts repositories create calibrate-mcp \
-     --repository-format=docker --location=asia-south1
-   ```
-3. **Create a deployer service account** with roles `roles/run.admin`,
-   `roles/artifactregistry.writer`, and `roles/iam.serviceAccountUser`.
-4. **Set up Workload Identity Federation** for GitHub: a WIF pool + provider for
-   `https://token.actions.githubusercontent.com`, with this repo allowed to impersonate
-   the service account (`assertion.repository == "<org>/<repo>"`).
-5. **Set repo secrets** `GCP_WIF_PROVIDER` (the provider resource name) and
-   `GCP_SERVICE_ACCOUNT` (the deployer SA email).
-6. **Set the workflow `env`:** `GCP_PROJECT`, and `GCP_REGION` if not `asia-south1`.
+Run once, as a project owner/admin. Set the variables first:
+
+```bash
+PROJECT_ID=<your-project-id>
+REGION=asia-south1
+GH_REPO=dalmia/calibrate-mcp-deploy          # owner/repo of THIS repo
+SA=calibrate-mcp-deployer
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+SA_EMAIL="$SA@$PROJECT_ID.iam.gserviceaccount.com"
+```
+
+```bash
+# 1. Enable APIs
+gcloud services enable \
+  run.googleapis.com artifactregistry.googleapis.com \
+  iamcredentials.googleapis.com sts.googleapis.com --project "$PROJECT_ID"
+
+# 2. Artifact Registry repo the workflow pushes to
+gcloud artifacts repositories create calibrate-mcp \
+  --repository-format=docker --location="$REGION" --project "$PROJECT_ID" || true
+
+# 3. Deployer service account + roles
+gcloud iam service-accounts create "$SA" \
+  --display-name="calibrate-mcp GitHub deployer" --project "$PROJECT_ID"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" --role="roles/run.admin"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" --role="roles/artifactregistry.writer"
+gcloud iam service-accounts add-iam-policy-binding \
+  "$PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+  --member="serviceAccount:$SA_EMAIL" --role="roles/iam.serviceAccountUser" \
+  --project "$PROJECT_ID"
+
+# 4. Workload Identity Federation (OIDC trust), restricted to this repo
+gcloud iam workload-identity-pools create github \
+  --location=global --display-name="GitHub Actions" --project "$PROJECT_ID"
+gcloud iam workload-identity-pools providers create-oidc github \
+  --location=global --workload-identity-pool=github --display-name="GitHub OIDC" \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='$GH_REPO'" --project "$PROJECT_ID"
+
+# 5. Let only this repo impersonate the SA
+gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/$GH_REPO" \
+  --project "$PROJECT_ID"
+
+# 6. Store the two values GitHub Actions needs
+gh secret set GCP_WIF_PROVIDER --repo "$GH_REPO" \
+  --body "projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github"
+gh secret set GCP_SERVICE_ACCOUNT --repo "$GH_REPO" --body "$SA_EMAIL"
+```
+
+Then set `GCP_PROJECT` (and `GCP_REGION` if not `asia-south1`) in the workflow's `env`
+block and commit.
 
 **Run:** Actions → **Build & deploy calibrate-mcp** → Run workflow (blank version = latest
 published). Uncomment the `schedule:` block to deploy new npm releases daily.
