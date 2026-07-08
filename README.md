@@ -128,6 +128,35 @@ GitHub Action, which passes it as a build-arg).
 
 Cloud Run returns an HTTPS URL like `https://calibrate-mcp-xxxx-el.a.run.app`.
 
+## Custom domain (HTTPS load balancer)
+
+`asia-south1` does not support Cloud Run domain mappings, so front the service with a
+global external HTTPS load balancer. Run once (each command is one line; replace the
+domain if yours differs). "already exists" on any line = that piece is done, skip it.
+
+```bash
+gcloud compute addresses create calibrate-mcp-ip --global
+gcloud compute network-endpoint-groups create calibrate-mcp-neg --region=asia-south1 --network-endpoint-type=serverless --cloud-run-service=calibrate-mcp
+gcloud compute backend-services create calibrate-mcp-backend --global --load-balancing-scheme=EXTERNAL_MANAGED
+gcloud compute backend-services add-backend calibrate-mcp-backend --global --network-endpoint-group=calibrate-mcp-neg --network-endpoint-group-region=asia-south1
+gcloud compute url-maps create calibrate-mcp-urlmap --default-service=calibrate-mcp-backend
+gcloud compute ssl-certificates create calibrate-mcp-cert --domains=mcp.calibrate.artpark.ai
+gcloud compute target-https-proxies create calibrate-mcp-https-proxy --url-map=calibrate-mcp-urlmap --ssl-certificates=calibrate-mcp-cert
+gcloud compute forwarding-rules create calibrate-mcp-fr --global --load-balancing-scheme=EXTERNAL_MANAGED --network-tier=PREMIUM --address=calibrate-mcp-ip --target-https-proxy=calibrate-mcp-https-proxy --ports=443
+```
+
+Get the load balancer IP, then check the cert:
+
+```bash
+gcloud compute addresses describe calibrate-mcp-ip --global --format='value(address)'
+gcloud compute ssl-certificates describe calibrate-mcp-cert --global --format='value(managed.status)'
+```
+
+Add a DNS record `A  mcp.calibrate  → <that IP>` (under `artpark.ai`). The managed cert
+only validates after DNS points at the IP: `PROVISIONING` → wait 15–60 min, `ACTIVE` →
+`https://mcp.calibrate.artpark.ai/mcp` is live. The load balancer has a small always-on
+cost (~$18/mo).
+
 ## Point clients at it
 
 Each user configures the URL + **their own** Calibrate API key:
