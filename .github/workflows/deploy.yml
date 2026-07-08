@@ -5,6 +5,7 @@
 # keys, same token-free model as the npm publish. One-time GCP setup is in
 # README.md ("Automated deploy").
 name: Build & deploy calibrate-mcp
+run-name: Deploy calibrate-mcp ${{ inputs.version || 'latest' }}
 
 on:
   workflow_dispatch:
