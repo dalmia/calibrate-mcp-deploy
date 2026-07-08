@@ -1,0 +1,83 @@
+# Builds the calibrate-mcp container from the published npm package, pushes it to
+# GCP Artifact Registry, and deploys it to Cloud Run — no local Docker.
+#
+# Auth to GCP is via Workload Identity Federation (GitHub OIDC) — no stored GCP
+# keys, same token-free model as the npm publish. One-time GCP setup is in
+# README.md ("Automated deploy").
+name: Build & deploy calibrate-mcp
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "npm version of @dalmia/calibrate-mcp to ship (blank = latest published)"
+        required: false
+  # Uncomment to auto-ship new npm releases daily:
+  # schedule:
+  #   - cron: "0 6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - ".github/workflows/deploy.yml"
+
+permissions:
+  contents: read
+  id-token: write # for GCP Workload Identity Federation
+
+env:
+  GCP_REGION: asia-south1
+  GCP_PROJECT: your-project-id # <-- set your GCP project id
+  AR_REPO: calibrate-mcp # Artifact Registry repo
+  SERVICE: calibrate-mcp # Cloud Run service name
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version to ship
+        id: ver
+        run: |
+          V="${{ github.event.inputs.version }}"
+          if [ -z "$V" ]; then
+            V=$(npm view @dalmia/calibrate-mcp version)
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Shipping @dalmia/calibrate-mcp@$V"
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Build & push image
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${AR_REPO}/${SERVICE}"
+          docker build --build-arg MCP_VERSION="$VERSION" \
+            -t "$IMAGE:$VERSION" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:latest"
+
+      - name: Deploy to Cloud Run
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${AR_REPO}/${SERVICE}"
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE:$VERSION" \
+            --region "$GCP_REGION" \
+            --allow-unauthenticated \
+            --port 8080 \
+            --cpu 1 --memory 512Mi \
+            --min-instances 0 --max-instances 3
