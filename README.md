@@ -90,9 +90,6 @@ gh variable set GCP_PROJECT --repo "$GH_REPO" --body "$PROJECT_ID"
 # gh variable set GCP_REGION --repo "$GH_REPO" --body "$REGION"
 ```
 
-The workflow reads `GCP_PROJECT` / `GCP_REGION` from repo **variables**, so there's no
-project id hardcoded in the workflow and nothing to edit.
-
 **Run:** Actions → **Build & deploy calibrate-mcp** → Run workflow (blank version = latest
 published). Uncomment the `schedule:` block to deploy new npm releases daily.
 
