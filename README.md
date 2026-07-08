@@ -90,8 +90,18 @@ gh variable set GCP_PROJECT --repo "$GH_REPO" --body "$PROJECT_ID"
 # gh variable set GCP_REGION --repo "$GH_REPO" --body "$REGION"
 ```
 
-**Run:** Actions → **Build & deploy calibrate-mcp** → Run workflow (blank version = latest
-published). Uncomment the `schedule:` block to deploy new npm releases daily.
+### Run it
+
+GitHub → **Actions** → **Build & deploy calibrate-mcp** → **Run workflow**.
+
+The workflow has one optional input, **version** (the npm version of
+`@dalmia/calibrate-mcp` to deploy):
+
+- Leave it empty to deploy the **latest published** version.
+- Or type a specific version, e.g. `0.0.14`.
+
+To deploy new npm releases automatically once a day, uncomment the `schedule:` block
+at the top of `deploy.yml`.
 
 ## Manual deploy (local gcloud)
 
