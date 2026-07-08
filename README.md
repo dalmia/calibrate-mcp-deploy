@@ -1,4 +1,4 @@
-# calibrate-mcp remote hosting (GCP Cloud Run)
+# Deploy Calibrate MCP
 
 Deploys the published npm package [`@dalmia/calibrate-mcp`](https://www.npmjs.com/package/@dalmia/calibrate-mcp)
 as a **remote, multi-tenant** MCP server on GCP Cloud Run, so shell-less / non-CLI
