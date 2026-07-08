@@ -26,39 +26,30 @@ You can deploy **automatically via GitHub Actions** (recommended) or **manually*
 
 ## Automated deploy (GitHub Actions)
 
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) builds the image from
-the published npm package, pushes it to Artifact Registry, and deploys to Cloud Run —
-no local Docker, no stored GCP keys (auth is Workload Identity Federation / GitHub
-OIDC, same token-free model as the npm publish).
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) builds the image, pushes
+it to Artifact Registry, and deploys to Cloud Run. It authenticates to GCP with Workload
+Identity Federation (GitHub OIDC), so there is no service-account key to store.
 
 **One-time GCP setup:**
 
-1. **Push this folder to a GitHub repo** (e.g. `ARTPARK-SAHAI-ORG/calibrate-mcp-deploy`)
-   so Actions can run.
-2. **Enable APIs:** `run.googleapis.com`, `artifactregistry.googleapis.com`,
+1. **Enable APIs:** `run.googleapis.com`, `artifactregistry.googleapis.com`,
    `iamcredentials.googleapis.com`.
-3. **Create the Artifact Registry repo** (once):
+2. **Create the Artifact Registry repo:**
    ```bash
    gcloud artifacts repositories create calibrate-mcp \
      --repository-format=docker --location=asia-south1
    ```
-4. **Create a deployer service account** with roles:
-   `roles/run.admin`, `roles/artifactregistry.writer`, and `roles/iam.serviceAccountUser`
-   (to deploy as the Cloud Run runtime SA).
-5. **Set up Workload Identity Federation** for GitHub: create a WIF pool + provider for
-   `https://token.actions.githubusercontent.com`, and let this repo impersonate the
-   service account (attribute condition on `assertion.repository == "<org>/<repo>"`).
-6. **Set repo secrets:**
-   - `GCP_WIF_PROVIDER` — the provider resource name
-     (`projects/<num>/locations/global/workloadIdentityPools/<pool>/providers/<provider>`)
-   - `GCP_SERVICE_ACCOUNT` — the deployer SA email
-7. **Set the workflow `env`:** `GCP_PROJECT` (your project id) and `GCP_REGION` if not
-   `asia-south1`.
+3. **Create a deployer service account** with roles `roles/run.admin`,
+   `roles/artifactregistry.writer`, and `roles/iam.serviceAccountUser`.
+4. **Set up Workload Identity Federation** for GitHub: a WIF pool + provider for
+   `https://token.actions.githubusercontent.com`, with this repo allowed to impersonate
+   the service account (`assertion.repository == "<org>/<repo>"`).
+5. **Set repo secrets** `GCP_WIF_PROVIDER` (the provider resource name) and
+   `GCP_SERVICE_ACCOUNT` (the deployer SA email).
+6. **Set the workflow `env`:** `GCP_PROJECT`, and `GCP_REGION` if not `asia-south1`.
 
-**Run it:** Actions → **Build & deploy calibrate-mcp** → Run workflow (blank version =
-latest published). It resolves the npm version, builds, pushes `:<version>` + `:latest`
-to Artifact Registry, and deploys to Cloud Run. Uncomment the `schedule:` block to
-auto-ship new npm releases daily.
+**Run:** Actions → **Build & deploy calibrate-mcp** → Run workflow (blank version = latest
+published). Uncomment the `schedule:` block to deploy new npm releases daily.
 
 ## Manual deploy (local gcloud)
 
